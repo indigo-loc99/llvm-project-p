@@ -1,0 +1,15 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "win-libcxx-min-zlib-x64",
+      "description": "Windows Clang, bundled with exceptionless and non-RTTI libcxx, with file compression support.",
+      "inherits": [ "windows-standard-x64", "build-libcxx-noehrtti", "compression-support", "default-to-cxx20", "host-arch-target", "use-vcpkg"]
+    },
+    {
+      "name": "linux-libcxx-noehrtti-compression",
+      "description": "Clang, bundled with exceptionless and non-RTTI libcxx, with file compression support",
+      "inherits": ["linux-standard", "build-libcxx-noehrtti", "compression-support", "default-to-cxx20", "host-arch-target", "use-vcpkg-no-manifest-mode"]
+    }
+  ]
+}
