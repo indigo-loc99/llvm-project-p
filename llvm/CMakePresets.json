@@ -87,7 +87,7 @@
 			"name": "build-libcxx-libcxxabi-libunwind",
 			"inherits": ["build-libcxx"],
 			"hidden": true,
-			"environment": {"_LIBCXXABI_LIBUNWIND": "libcxxabi;libunwind;",
+			"environment": {"_LIBCXXABI_LIBUNWIND": "libcxxabi;libunwind",
 				"LLVM_RUNTIMES": "$env{LLVM_RUNTIMES_MAIN};$env{_LIBCXXABI_LIBUNWIND}"
 			},
 			"cacheVariables": {
@@ -114,7 +114,7 @@
 		},
 		{
 			"name": "build-libcxx-noehrtti",
-			"inherits": ["build-libcxx"],
+			"inherits": ["build-libcxx-libcxxabi-libunwind"],
 			"hidden": true,
 			"description": "Build libc++ without exception and RTTI support",
 			"cacheVariables": {
