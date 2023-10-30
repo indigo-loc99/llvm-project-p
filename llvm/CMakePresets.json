@@ -129,6 +129,22 @@
 			}
 		},
 		{
+			"name": "build-libcxx-win-noehrtti",
+			"inherits": ["build-libcxx"],
+			"hidden": true,
+			"description": "Build libc++ without exception and RTTI support (On Windows using VCRuntime",
+			"cacheVariables": {
+				"LIBCXX_ENABLE_EXCEPTIONS": {
+					"type": "BOOL",
+					"value": "OFF"
+				},
+				"LIBCXX_ENABLE_RTTI": {
+					"type": "BOOL",
+					"value": "OFF"
+				}
+			}
+		},
+		{
 			"name": "linux-standard",
 			"description": "Minimal compiler+linker for Linux",
 			"inherits": [ "build-clang", "release-config", "linux-debug" ]
