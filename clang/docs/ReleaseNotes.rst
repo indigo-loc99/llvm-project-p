@@ -209,6 +209,12 @@ C23 Feature Support
 - Clang now supports ``<stdckdint.h>`` which defines several macros for performing
   checked integer arithmetic. It is also exposed in pre-C23 modes.
 
+- Completed the implementation of
+  `N2508 <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2508.pdf>`_. We
+  previously implemented allowing a label at the end of a compound statement,
+  and now we've implemented allowing a label to be followed by a declaration
+  instead of a statement.
+
 Non-comprehensive list of changes in this release
 -------------------------------------------------
 
@@ -217,6 +223,10 @@ Non-comprehensive list of changes in this release
   (e.g., ``uint16x8_t``), this returns the constant number of elements at compile-time.
   For scalable vectors, e.g., SVE or RISC-V V, the number of elements is not known at compile-time and is
   determined at runtime.
+* The ``__datasizeof`` keyword has been added. It is similar to ``sizeof``
+  except that it returns the size of a type ignoring tail padding.
+* ``__builtin_classify_type()`` now classifies ``_BitInt`` values as the return value ``18``,
+  to match GCC 14's behavior.
 
 New Compiler Flags
 ------------------
@@ -232,6 +242,12 @@ New Compiler Flags
   preserving ``#include`` directives for "system" headers instead of copying
   the preprocessed text to the output. This can greatly reduce the size of the
   preprocessed output, which can be helpful when trying to reduce a test case.
+* ``-fassume-nothrow-exception-dtor`` is added to assume that the destructor of
+  an thrown exception object will not throw. The generated code for catch
+  handlers will be smaller. A throw expression of a type with a
+  potentially-throwing destructor will lead to an error.
+
+* ``-fopenacc`` was added as a part of the effort to support OpenACC in clang.
 
 Deprecated Compiler Flags
 -------------------------
@@ -287,6 +303,36 @@ Attribute Changes in Clang
 
   When viewing ``S::FruitKind`` in a debugger, it will behave as if the member
   was declared as type ``E`` rather than ``unsigned``.
+
+- Clang now warns you that the ``_Alignas`` attribute on declaration specifiers
+  is ignored, changed from the former incorrect suggestion to move it past
+  declaration specifiers. (`#58637 <https://github.com/llvm/llvm-project/issues/58637>`_)
+
+- Clang now introduced ``[[clang::coro_only_destroy_when_complete]]`` attribute
+  to reduce the size of the destroy functions for coroutines which are known to
+  be destroyed after having reached the final suspend point.
+
+- Clang now introduced ``[[clang::coro_return_type]]`` and ``[[clang::coro_wrapper]]``
+  attributes. A function returning a type marked with ``[[clang::coro_return_type]]``
+  should be a coroutine. A non-coroutine function marked with ``[[clang::coro_wrapper]]``
+  is still allowed to return the such a type. This is helpful for analyzers to recognize coroutines from the function signatures.
+
+- Clang now supports ``[[clang::code_align(N)]]`` as an attribute which can be
+  applied to a loop and specifies the byte alignment for a loop. This attribute
+  accepts a positive integer constant initialization expression indicating the
+  number of bytes for the minimum alignment boundary. Its value must be a power
+  of 2, between 1 and 4096(inclusive).
+
+  .. code-block:: c++
+
+      void Array(int *array, size_t n) {
+        [[clang::code_align(64)]] for (int i = 0; i < n; ++i) array[i] = 0;
+      }
+
+      template<int A>
+      void func() {
+        [[clang::code_align(A)]] for(;;) { }
+      }
 
 Improvements to Clang's diagnostics
 -----------------------------------
@@ -426,6 +472,16 @@ Improvements to Clang's diagnostics
 - ``-Wzero-as-null-pointer-constant`` diagnostic is no longer emitted when using ``__null``
   (or, more commonly, ``NULL`` when the platform defines it as ``__null``) to be more consistent
   with GCC.
+- Clang will warn on deprecated specializations used in system headers when their instantiation
+  is caused by user code.
+
+Improvements to Clang's time-trace
+----------------------------------
+- Two time-trace scope variables are added. A time trace scope variable of
+  ``ParseDeclarationOrFunctionDefinition`` with the function's source location
+  is added to record the time spent parsing the function's declaration or
+  definition. Another time trace scope variable of ``ParseFunctionDefinition``
+  is also added to record the name of the defined function.
 
 Bug Fixes in This Version
 -------------------------
@@ -533,6 +589,27 @@ Bug Fixes in This Version
   Fixes (`#67687 <https://github.com/llvm/llvm-project/issues/67687>`_)
 - Fix crash from constexpr evaluator evaluating uninitialized arrays as rvalue.
   Fixes (`#67317 <https://github.com/llvm/llvm-project/issues/67317>`_)
+- Clang now properly diagnoses use of stand-alone OpenMP directives after a
+  label (including ``case`` or ``default`` labels).
+
+  Before:
+
+  .. code-block:: c++
+
+    label:
+    #pragma omp barrier // ok
+
+  After:
+
+  .. code-block:: c++
+
+    label:
+    #pragma omp barrier // error: '#pragma omp barrier' cannot be an immediate substatement
+
+- Fixed an issue that a benign assertion might hit when instantiating a pack expansion
+  inside a lambda. (`#61460 <https://github.com/llvm/llvm-project/issues/61460>`_)
+- Fix crash during instantiation of some class template specializations within class
+  templates. Fixes (`#70375 <https://github.com/llvm/llvm-project/issues/70375>`_)
 
 Bug Fixes to Compiler Builtins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -657,11 +734,6 @@ Bug Fixes to C++ Support
   declaration definition. Fixes:
   (`#61763 <https://github.com/llvm/llvm-project/issues/61763>`_)
 
-- Fix a bug where implicit deduction guides are not correctly generated for nested template
-  classes. Fixes:
-  (`#46200 <https://github.com/llvm/llvm-project/issues/46200>`_)
-  (`#57812 <https://github.com/llvm/llvm-project/issues/57812>`_)
-
 - Diagnose use of a variable-length array in a coroutine. The design of
   coroutines is such that it is not possible to support VLA use. Fixes:
   (`#65858 <https://github.com/llvm/llvm-project/issues/65858>`_)
@@ -669,6 +741,14 @@ Bug Fixes to C++ Support
 - Fix bug where we were overriding zero-initialization of class members when
   default initializing a base class in a constant expression context. Fixes:
   (`#69890 <https://github.com/llvm/llvm-project/issues/69890>`_)
+
+- Fix crash when template class static member imported to other translation unit.
+  Fixes:
+  (`#68769 <https://github.com/llvm/llvm-project/issues/68769>`_)
+
+- Clang now defers the instantiation of explicit specifier until constraint checking
+  completes (except deduction guides). Fixes:
+  (`#59827 <https://github.com/llvm/llvm-project/issues/59827>`_)
 
 Bug Fixes to AST Handling
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -697,6 +777,21 @@ Miscellaneous Clang Crashes Fixed
   `Issue 64564 <https://github.com/llvm/llvm-project/issues/64564>`_
 - Fixed a crash when an ObjC ivar has an invalid type. See
   (`#68001 <https://github.com/llvm/llvm-project/pull/68001>`_)
+- Fixed a crash in C when redefined struct is another nested redefinition.
+  `Issue 41302 <https://github.com/llvm/llvm-project/issues/41302>`_
+- Fixed a crash when ``-ast-dump=json`` was used for code using class
+  template deduction guides.
+
+OpenACC Specific Changes
+------------------------
+- OpenACC Implementation effort is beginning with semantic analysis and parsing
+  of OpenACC pragmas. The ``-fopenacc`` flag was added to enable these new,
+  albeit incomplete changes. The ``_OPENACC`` macro is currently defined to
+  ``1``, as support is too incomplete to update to a standards-required value.
+- Added ``-fexperimental-openacc-macro-override``, a command line option to
+  permit overriding the ``_OPENACC`` macro to be any digit-only value specified
+  by the user, which permits testing the compiler against existing OpenACC
+  workloads in order to evaluate implementation progress.
 
 Target Specific Changes
 -----------------------
@@ -726,6 +821,14 @@ Arm and AArch64 Support
   (https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst).
   This affects C++ functions with SVE ACLE parameters. Clang will use the old
   manglings if ``-fclang-abi-compat=17`` or lower is  specified.
+
+- New AArch64 asm constraints have been added for r8-r11(Uci) and r12-r15(Ucj).
+
+  Support has been added for the following processors (-mcpu identifiers in parenthesis):
+
+  * Arm Cortex-A520 (cortex-a520).
+  * Arm Cortex-A720 (cortex-a720).
+  * Arm Cortex-X4 (cortex-x4).
 
 Android Support
 ^^^^^^^^^^^^^^^
@@ -809,6 +912,8 @@ Floating Point Support in Clang
 - Add ``__builtin_exp10``, ``__builtin_exp10f``,
   ``__builtin_exp10f16``, ``__builtin_exp10l`` and
   ``__builtin_exp10f128`` builtins.
+- Add ``__builtin_iszero``, ``__builtin_issignaling`` and
+  ``__builtin_issubnormal``.
 
 AST Matchers
 ------------
@@ -833,6 +938,10 @@ Static Analyzer
 - Added a new checker ``core.BitwiseShift`` which reports situations where
   bitwise shift operators produce undefined behavior (because some operand is
   negative or too large).
+
+- Move checker ``alpha.unix.Errno`` out of the ``alpha`` package
+  to ``unix.Errno``.
+
 - Move checker ``alpha.unix.StdCLibraryFunctions`` out of the ``alpha`` package
   to ``unix.StdCLibraryFunctions``.
 
