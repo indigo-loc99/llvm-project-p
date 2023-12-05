@@ -1,0 +1,164 @@
+﻿{
+  "version": 4,
+  "include": ["PresetsLinux.json", "PresetsWindows.json"],
+  "configurePresets": [
+		{
+			"name": "build-clang",
+			"hidden": true,
+			"cacheVariables": { "LLVM_ENABLE_PROJECTS": {"type": "STRING", "value": "clang;lld;"}}
+		},
+		{
+			"name": "use-vcpkg",
+			"hidden": true,
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"condition": {
+				"type": "notEquals",
+				"lhs": "$env{VCPKG_ROOT}",
+				"rhs": ""
+			}
+		},
+		{
+			"name": "use-vcpkg-no-manifest-mode",
+			"inherits": [ "use-vcpkg" ],
+			"hidden": true,
+			"cacheVariables": {
+				"VCPKG_MANIFEST_MODE": {"type": "BOOL", "value": "OFF"}
+			}
+		},
+		{
+			"name": "host-arch-target",
+			"hidden": true,
+			"cacheVariables": {"LLVM_TARGETS_TO_BUILD": {"type": "STRING", "value": "host"}}
+		},
+		{
+			"name": "relwithdebinfo-config",
+			"hidden": true,
+			"cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}
+		},
+		{
+			"name": "release-config",
+			"hidden": true,
+			"cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}
+		},
+		{
+			"name": "default-to-cxx20",
+			"hidden": true,
+			"cacheVariables": {
+				"CMAKE_CXX_STANDARD": {
+					"type": "STRING",
+					"value": "20"
+				}
+			}
+		},
+		{
+			"name": "compression-support",
+			"hidden": true,
+			"cacheVariables": {
+				"LLVM_ENABLE_ZLIB" : {
+					"type": "STRING",
+					"value": "FORCE_ON"
+				},
+				"LLVM_ENABLE_ZSTD" : {
+					"type": "STRING",
+					"value": "FORCE_ON"
+				}
+			}
+		},
+		{
+			"name": "build-libcxx-base",
+			"environment": {"LLVM_RUNTIMES_MAIN": "libcxx"},
+			"hidden": true,
+			"cacheVariables": {
+				"LLVM_ENABLE_RUNTIMES": {
+					"type": "STRING",
+					"value": "$env{LLVM_RUNTIMES_MAIN}"
+				},
+				"LIBCXX_ENABLE_SHARED": {
+					"type": "BOOL",
+					"value": "ON"
+				},
+				"LIBCXX_ENABLE_STATIC": {
+					"type": "BOOL",
+					"value": "ON"
+				}
+			}
+		},
+		{
+			"name": "build-libcxx-libcxxabi-libunwind",
+			"inherits": ["build-libcxx-base"],
+			"hidden": true,
+			"environment": {"_LIBCXXABI_LIBUNWIND": "libcxxabi;libunwind",
+				"LLVM_RUNTIMES": "$env{LLVM_RUNTIMES_MAIN};$env{_LIBCXXABI_LIBUNWIND}"
+			},
+			"cacheVariables": {
+				"LLVM_ENABLE_RUNTIMES": {
+					"type": "STRING",
+					"value": "$env{LLVM_RUNTIMES}"
+				}
+			},
+			"condition": {
+				"type": "anyOf",
+				"conditions": [
+					{
+						"type": "equals",
+						"lhs": "${hostSystemName}",
+						"rhs": "Linux"
+					},
+					{
+						"type": "equals",
+						"lhs": "${hostSystemName}",
+						"rhs": "Darwin"
+					}
+				]
+			}
+		},
+		{
+			"name": "build-libcxx",
+			"inherits": ["build-libcxx-libcxxabi-libunwind"]
+		},
+		{
+			"name": "build-libcxx-win",
+			"inherits": ["build-libcxx-base"]
+		},
+		{
+			"name": "noehrtti",
+			"hidden": true,
+			"description": "Build libc++ without exception and RTTI support",
+			"cacheVariables": {
+				"LIBCXX_ENABLE_EXCEPTIONS": {
+					"type": "BOOL",
+					"value": "OFF"
+				},
+				"LIBCXX_ENABLE_RTTI": {
+					"type": "BOOL",
+					"value": "OFF"
+				}
+			}
+		},
+		{
+			"name": "noehrtti-win",
+			"hidden": true,
+			"description": "Build libc++ without exception and RTTI support (On Windows using VCRuntime",
+			"cacheVariables": {
+				"LIBCXX_ENABLE_EXCEPTIONS": {
+					"type": "BOOL",
+					"value": "OFF"
+				},
+				"LIBCXX_ENABLE_RTTI": {
+					"type": "BOOL",
+					"value": "OFF"
+				}
+			}
+		},
+		{
+			"name": "libcxx-linux-standard",
+			"description": "Minimal compiler+linker for Linux",
+			"inherits": [ "build-libcxx", "release-config", "linux-debug" ]
+		},
+		{
+			"name": "libcxx-windows-standard-x64",
+			"description": "Minimal compiler+linker for Windows",
+			"inherits": ["build-libcxx-win", "release-config", "x64-release", "windows-no-gnu-env"]
+		}
+  ]
+}
