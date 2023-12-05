@@ -2166,6 +2166,9 @@ def int_aarch64_sve_ld1_gather_uxtw_index : AdvSIMD_GatherLoad_SV_32b_Offsets_In
 // 128-bit loads, scaled offsets (indices)
 def int_aarch64_sve_ld1q_gather_index : AdvSIMD_GatherLoadQ_SV_Intrinsic;
 
+// 128-bit loads, unscaled offsets
+def int_aarch64_sve_ld1q_gather_vector_offset : AdvSIMD_GatherLoadQ_SV_Intrinsic;
+
 //
 // Gather loads: vector base + scalar offset
 //
@@ -2246,6 +2249,9 @@ def int_aarch64_sve_st1_scatter_uxtw_index
 
 // 128-bit stores, scaled offsets (indices)
 def int_aarch64_sve_st1q_scatter_index : AdvSIMD_ScatterStoreQ_SV_Intrinsic;
+
+// 128-bit stores, unscaled offsets
+def int_aarch64_sve_st1q_scatter_vector_offset : AdvSIMD_ScatterStoreQ_SV_Intrinsic;
 
 //
 // Scatter stores: vector base + scalar offset
@@ -3538,6 +3544,10 @@ let TargetPrefix = "aarch64" in {
   def int_aarch64_sme_ldr_zt : SME_LDR_STR_ZT_Intrinsic;
   def int_aarch64_sme_str_zt : SME_LDR_STR_ZT_Intrinsic;
 
+  //
+  //  Zero ZT0
+  //
+  def int_aarch64_sme_zero_zt : DefaultAttrsIntrinsic<[], [llvm_i32_ty], [ImmArg<ArgIndex<0>>, IntrWriteMem]>;
 }
 
 // SVE2.1 - ZIPQ1, ZIPQ2, UZPQ1, UZPQ2

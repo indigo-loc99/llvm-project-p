@@ -56,6 +56,9 @@ struct CustomDataLayoutSpec
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CustomDataLayoutSpec)
 
   using Base::Base;
+
+  static constexpr StringLiteral name = "test.custom_data_layout_spec";
+
   static CustomDataLayoutSpec get(MLIRContext *ctx,
                                   ArrayRef<DataLayoutEntryInterface> entries) {
     return Base::get(ctx, entries);
@@ -83,6 +86,8 @@ struct SingleQueryType
 
   using Base::Base;
 
+  static constexpr StringLiteral name = "test.single_query";
+
   static SingleQueryType get(MLIRContext *ctx) { return Base::get(ctx); }
 
   llvm::TypeSize getTypeSizeInBits(const DataLayout &layout,
@@ -92,7 +97,7 @@ struct SingleQueryType
       llvm::report_fatal_error("repeated call");
 
     executed = true;
-    return llvm::TypeSize::Fixed(1);
+    return llvm::TypeSize::getFixed(1);
   }
 
   uint64_t getABIAlignment(const DataLayout &layout,
@@ -131,6 +136,8 @@ struct TypeNoLayout : public Type::TypeBase<TypeNoLayout, Type, TypeStorage> {
 
   using Base::Base;
 
+  static constexpr StringLiteral name = "test.no_layout";
+
   static TypeNoLayout get(MLIRContext *ctx) { return Base::get(ctx); }
 };
 
@@ -161,10 +168,10 @@ struct OpWithLayout : public Op<OpWithLayout, DataLayoutOpInterface::Trait> {
     if (auto iType = dyn_cast<IntegerType>(type)) {
       for (DataLayoutEntryInterface entry : params)
         if (llvm::dyn_cast_if_present<Type>(entry.getKey()) == type)
-          return llvm::TypeSize::Fixed(
+          return llvm::TypeSize::getFixed(
               8 *
               cast<IntegerAttr>(entry.getValue()).getValue().getZExtValue());
-      return llvm::TypeSize::Fixed(8 * iType.getIntOrFloatBitWidth());
+      return llvm::TypeSize::getFixed(8 * iType.getIntOrFloatBitWidth());
     }
 
     // Use the default process for everything else.
