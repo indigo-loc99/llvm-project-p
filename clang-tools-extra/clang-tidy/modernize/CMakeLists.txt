@@ -31,6 +31,7 @@ add_clang_library(clangTidyModernizeModule
   UseBoolLiteralsCheck.cpp
   UseConstraintsCheck.cpp
   UseDefaultMemberInitCheck.cpp
+  UseDesignatedInitializersCheck.cpp
   UseEmplaceCheck.cpp
   UseEqualsDefaultCheck.cpp
   UseEqualsDeleteCheck.cpp
@@ -39,6 +40,7 @@ add_clang_library(clangTidyModernizeModule
   UseNullptrCheck.cpp
   UseOverrideCheck.cpp
   UseStartsEndsWithCheck.cpp
+  UseStdNumbersCheck.cpp
   UseStdPrintCheck.cpp
   UseTrailingReturnTypeCheck.cpp
   UseTransparentFunctorsCheck.cpp

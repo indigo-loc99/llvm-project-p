@@ -387,6 +387,7 @@ static void splitCallSite(CallBase &CB,
   // do not introduce unnecessary PHI nodes for def-use chains from the call
   // instruction to the beginning of the block.
   auto I = CB.getReverseIterator();
+  Instruction *OriginalBeginInst = &*OriginalBegin;
   while (I != TailBB->rend()) {
     Instruction *CurrentI = &*I++;
     if (!CurrentI->use_empty()) {
@@ -405,7 +406,7 @@ static void splitCallSite(CallBase &CB,
     CurrentI->dropDbgValues();
     CurrentI->eraseFromParent();
     // We are done once we handled the first original instruction in TailBB.
-    if (CurrentI == &*OriginalBegin)
+    if (CurrentI == OriginalBeginInst)
       break;
   }
 }

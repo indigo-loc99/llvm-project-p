@@ -163,19 +163,6 @@ func.func @tensor.generate(%m : index, %n : index)
 
 // -----
 
-func.func @generate_negative_size() -> tensor<?x8xi32> {
-  %cst = arith.constant 0 : i32
-  %size = index.constant -128
-  // expected-error@+1 {{tensor dimensions must be non-negative}}
-  %tensor = tensor.generate %size {
-  ^bb0(%arg0: index, %arg1: index):
-    tensor.yield %cst : i32
-  } : tensor<?x8xi32>
-  return %tensor : tensor<?x8xi32>
-}
-
-// -----
-
 func.func @tensor.reshape_element_type_mismatch(
        %buf: tensor<*xf32>, %shape: tensor<1xi32>) {
   // expected-error @+1 {{element types of source and destination tensor types should be the same}}
@@ -456,6 +443,14 @@ func.func @invalid_splat(%v : vector<8xf32>) {
 
 // -----
 
+func.func @invalid_splat(%v: f32, %m: index) {
+  // expected-error@+1 {{incorrect number of dynamic sizes, has 1, expected 2}}
+  %w = tensor.splat %v[%m] : tensor<?x8x?xf32>
+  return
+}
+
+// -----
+
 func.func @gather_empty_dims(
     %source : tensor<4x5x6xf32>, %indices: tensor<1x2x3xindex>) {
   // expected-error@+1 {{gather_dims must be non-empty}}
@@ -602,10 +597,26 @@ func.func @empty_wrong_number_of_operands(%sz : index) {
 // -----
 
 func.func @pack_invalid_no_padding_no_full_tiles(%input: tensor<256x128xf32>, %output: tensor<8x8x16x33xf32>) -> tensor<8x8x16x33xf32> {
-  // expected-error@+1 {{invalid tile factor provided. Only full tiles are supported when padding_value is not set}}
+  // expected-error@+1 {{invalid tile factor or output size provided. Only full tiles are supported when padding_value is not set}}
   %0 = tensor.pack %input inner_dims_pos = [1, 0] inner_tiles = [16, 33] into %output : tensor<256x128xf32>  -> tensor<8x8x16x33xf32>
   return %0 : tensor<8x8x16x33xf32>
 }
+
+// -----
+
+func.func @pack_invalid_no_padding_no_full_tiles_dyn_tiles(%input: tensor<256x128xf32>, %output: tensor<10x8x?x?xf32>, %tile_size_0: index, %tile_size_1: index) -> tensor<10x8x?x?xf32> {
+  // expected-error@+1 {{invalid tile factor or output size provided. Only full tiles are supported when padding_value is not set}}
+  %0 = tensor.pack %input inner_dims_pos = [1, 0] inner_tiles = [%tile_size_0, %tile_size_1] into %output : tensor<256x128xf32>  -> tensor<10x8x?x?xf32>
+  return %0 : tensor<10x8x?x?xf32>
+} 
+
+// -----
+
+func.func @pack_invalid_no_padding_no_full_tiles_dyn_tiles_outperm(%input: tensor<256x128xf32>, %output: tensor<8x10x?x?xf32>, %tile_size_0: index, %tile_size_1: index) -> tensor<8x10x?x?xf32> {
+  // expected-error@+1 {{invalid tile factor or output size provided. Only full tiles are supported when padding_value is not set}}
+  %0 = tensor.pack %input outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [%tile_size_0, %tile_size_1] into %output : tensor<256x128xf32>  -> tensor<8x10x?x?xf32>
+  return %0 : tensor<8x10x?x?xf32>
+} 
 
 // -----
 

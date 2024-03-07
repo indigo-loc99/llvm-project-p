@@ -27,11 +27,6 @@ using namespace llvm;
 
 extern cl::opt<bool> UseNewDbgInfoFormat;
 
-// None of these tests are meaningful or do anything if we do not have the
-// experimental "head" bit compiled into ilist_iterator (aka
-// ilist_iterator_w_bits), thus there's no point compiling these tests in.
-#ifdef EXPERIMENTAL_DEBUGINFO_ITERATORS
-
 static std::unique_ptr<Module> parseIR(LLVMContext &C, const char *IR) {
   SMDiagnostic Err;
   std::unique_ptr<Module> Mod = parseAssemblyString(IR, Err, C);
@@ -168,8 +163,8 @@ TEST(BasicBlockDbgInfoTest, MarkerOperations) {
   EXPECT_EQ(Marker2->StoredDPValues.size(), 1u);
 
   // Unlink them and try to re-insert them through the basic block.
-  DPValue *DPV1 = &*Marker1->StoredDPValues.begin();
-  DPValue *DPV2 = &*Marker2->StoredDPValues.begin();
+  DbgRecord *DPV1 = &*Marker1->StoredDPValues.begin();
+  DbgRecord *DPV2 = &*Marker2->StoredDPValues.begin();
   DPV1->removeFromParent();
   DPV2->removeFromParent();
   EXPECT_TRUE(Marker1->StoredDPValues.empty());
@@ -193,8 +188,8 @@ TEST(BasicBlockDbgInfoTest, MarkerOperations) {
   EXPECT_EQ(BB.size(), 1u);
   EXPECT_EQ(Marker2->StoredDPValues.size(), 2u);
   // They should also be in the correct order.
-  SmallVector<DPValue *, 2> DPVs;
-  for (DPValue &DPV : Marker2->getDbgValueRange())
+  SmallVector<DbgRecord *, 2> DPVs;
+  for (DbgRecord &DPV : Marker2->getDbgValueRange())
     DPVs.push_back(&DPV);
   EXPECT_EQ(DPVs[0], DPV1);
   EXPECT_EQ(DPVs[1], DPV2);
@@ -204,13 +199,13 @@ TEST(BasicBlockDbgInfoTest, MarkerOperations) {
   EXPECT_EQ(BB.getTrailingDPValues(), nullptr);
   Instr2->removeFromParent();
   EXPECT_TRUE(BB.empty());
-  EndMarker = BB.getTrailingDPValues();;
+  EndMarker = BB.getTrailingDPValues();
   ASSERT_NE(EndMarker, nullptr);
   EXPECT_EQ(EndMarker->StoredDPValues.size(), 2u);
   // Again, these should arrive in the correct order.
 
   DPVs.clear();
-  for (DPValue &DPV : EndMarker->getDbgValueRange())
+  for (DbgRecord &DPV : EndMarker->getDbgValueRange())
     DPVs.push_back(&DPV);
   EXPECT_EQ(DPVs[0], DPV1);
   EXPECT_EQ(DPVs[1], DPV2);
@@ -225,14 +220,13 @@ TEST(BasicBlockDbgInfoTest, MarkerOperations) {
   // then they would sit "above" the new instruction.
   Instr1->insertBefore(BB, BB.end());
   EXPECT_EQ(Instr1->DbgMarker->StoredDPValues.size(), 2u);
-  // However we won't de-allocate the trailing marker until a terminator is
-  // inserted.
-  EXPECT_EQ(EndMarker->StoredDPValues.size(), 0u);
-  EXPECT_EQ(BB.getTrailingDPValues(), EndMarker);
+  // We should de-allocate the trailing marker when something is inserted
+  // at end().
+  EXPECT_EQ(BB.getTrailingDPValues(), nullptr);
 
   // Remove Instr1: now the DPValues will fall down again,
   Instr1->removeFromParent();
-  EndMarker = BB.getTrailingDPValues();;
+  EndMarker = BB.getTrailingDPValues();
   EXPECT_EQ(EndMarker->StoredDPValues.size(), 2u);
 
   // Inserting a terminator, however it's intended, should dislodge the
@@ -394,18 +388,18 @@ TEST(BasicBlockDbgInfoTest, InstrDbgAccess) {
   Instruction *CInst = BInst->getNextNode();
   Instruction *DInst = CInst->getNextNode();
 
-  ASSERT_TRUE(BInst->DbgMarker);
+  ASSERT_FALSE(BInst->DbgMarker);
   ASSERT_TRUE(CInst->DbgMarker);
   ASSERT_EQ(CInst->DbgMarker->StoredDPValues.size(), 1u);
-  DPValue *DPV1 = &*CInst->DbgMarker->StoredDPValues.begin();
+  DbgRecord *DPV1 = &*CInst->DbgMarker->StoredDPValues.begin();
   ASSERT_TRUE(DPV1);
-  EXPECT_EQ(BInst->DbgMarker->StoredDPValues.size(), 0u);
+  EXPECT_FALSE(BInst->hasDbgValues());
 
   // Clone DPValues from one inst to another. Other arguments to clone are
   // tested in DPMarker test.
   auto Range1 = BInst->cloneDebugInfoFrom(CInst);
   EXPECT_EQ(BInst->DbgMarker->StoredDPValues.size(), 1u);
-  DPValue *DPV2 = &*BInst->DbgMarker->StoredDPValues.begin();
+  DbgRecord *DPV2 = &*BInst->DbgMarker->StoredDPValues.begin();
   EXPECT_EQ(std::distance(Range1.begin(), Range1.end()), 1u);
   EXPECT_EQ(&*Range1.begin(), DPV2);
   EXPECT_NE(DPV1, DPV2);
@@ -537,15 +531,15 @@ protected:
     Branch = &*Last;
     CInst = &*Dest;
 
-    DPVA = &*BInst->DbgMarker->StoredDPValues.begin();
-    DPVB = &*Branch->DbgMarker->StoredDPValues.begin();
-    DPVConst = &*CInst->DbgMarker->StoredDPValues.begin();
+    DPVA = cast<DPValue>(&*BInst->DbgMarker->StoredDPValues.begin());
+    DPVB = cast<DPValue>(&*Branch->DbgMarker->StoredDPValues.begin());
+    DPVConst = cast<DPValue>(&*CInst->DbgMarker->StoredDPValues.begin());
   }
 
   void TearDown() override { UseNewDbgInfoFormat = false; }
 
   bool InstContainsDPValue(Instruction *I, DPValue *DPV) {
-    for (DPValue &D : I->getDbgValueRange()) {
+    for (DbgRecord &D : I->getDbgValueRange()) {
       if (&D == DPV) {
         // Confirm too that the links between the records are correct.
         EXPECT_EQ(DPV->Marker, I->DbgMarker);
@@ -557,8 +551,8 @@ protected:
   }
 
   bool CheckDPVOrder(Instruction *I, SmallVector<DPValue *> CheckVals) {
-    SmallVector<DPValue *> Vals;
-    for (DPValue &D : I->getDbgValueRange())
+    SmallVector<DbgRecord *> Vals;
+    for (DbgRecord &D : I->getDbgValueRange())
       Vals.push_back(&D);
 
     EXPECT_EQ(Vals.size(), CheckVals.size());
@@ -1395,8 +1389,8 @@ TEST(BasicBlockDbgInfoTest, DbgSpliceToEmpty1) {
   ASSERT_TRUE(BInst->hasDbgValues());
   EXPECT_EQ(BInst->DbgMarker->StoredDPValues.size(), 2u);
   SmallVector<DPValue *, 2> DPValues;
-  for (DPValue &DPV : BInst->getDbgValueRange())
-    DPValues.push_back(&DPV);
+  for (DbgRecord &DPV : BInst->getDbgValueRange())
+    DPValues.push_back(cast<DPValue>(&DPV));
 
   EXPECT_EQ(DPValues[0]->getVariableLocationOp(0), F.getArg(0));
   Value *SecondDPVValue = DPValues[1]->getVariableLocationOp(0);
@@ -1465,8 +1459,8 @@ TEST(BasicBlockDbgInfoTest, DbgSpliceToEmpty2) {
   ASSERT_TRUE(BInst->hasDbgValues());
   EXPECT_EQ(BInst->DbgMarker->StoredDPValues.size(), 1u);
   SmallVector<DPValue *, 2> DPValues;
-  for (DPValue &DPV : BInst->getDbgValueRange())
-    DPValues.push_back(&DPV);
+  for (DbgRecord &DPV : BInst->getDbgValueRange())
+    DPValues.push_back(cast<DPValue>(&DPV));
 
   EXPECT_EQ(DPValues[0]->getVariableLocationOp(0), F.getArg(0));
   // No trailing DPValues in the entry block now.
@@ -1477,9 +1471,62 @@ TEST(BasicBlockDbgInfoTest, DbgSpliceToEmpty2) {
   // ... except for some dangling DPValues.
   EXPECT_NE(Exit.getTrailingDPValues(), nullptr);
   EXPECT_FALSE(Exit.getTrailingDPValues()->empty());
+  Exit.getTrailingDPValues()->eraseFromParent();
   Exit.deleteTrailingDPValues();
 
   UseNewDbgInfoFormat = false;
 }
+
+// What if we moveBefore end() -- there might be no debug-info there, in which
+// case we shouldn't crash.
+TEST(BasicBlockDbgInfoTest, DbgMoveToEnd) {
+  LLVMContext C;
+  UseNewDbgInfoFormat = true;
+
+  std::unique_ptr<Module> M = parseIR(C, R"(
+    define i16 @f(i16 %a) !dbg !6 {
+    entry:
+      br label %exit
+
+    exit:
+      ret i16 0, !dbg !11
+    }
+    declare void @llvm.dbg.value(metadata, metadata, metadata) #0
+    attributes #0 = { nounwind readnone speculatable willreturn }
+
+    !llvm.dbg.cu = !{!0}
+    !llvm.module.flags = !{!5}
+
+    !0 = distinct !DICompileUnit(language: DW_LANG_C, file: !1, producer: "debugify", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug, enums: !2)
+    !1 = !DIFile(filename: "t.ll", directory: "/")
+    !2 = !{}
+    !5 = !{i32 2, !"Debug Info Version", i32 3}
+    !6 = distinct !DISubprogram(name: "foo", linkageName: "foo", scope: null, file: !1, line: 1, type: !7, scopeLine: 1, spFlags: DISPFlagDefinition | DISPFlagOptimized, unit: !0, retainedNodes: !8)
+    !7 = !DISubroutineType(types: !2)
+    !8 = !{!9}
+    !9 = !DILocalVariable(name: "1", scope: !6, file: !1, line: 1, type: !10)
+    !10 = !DIBasicType(name: "ty16", size: 16, encoding: DW_ATE_unsigned)
+    !11 = !DILocation(line: 1, column: 1, scope: !6)
+)");
+
+  Function &F = *M->getFunction("f");
+  BasicBlock &Entry = F.getEntryBlock();
+  BasicBlock &Exit = *Entry.getNextNode();
+  M->convertToNewDbgValues();
+
+  // Move the return to the end of the entry block.
+  Instruction *Br = Entry.getTerminator();
+  Instruction *Ret = Exit.getTerminator();
+  EXPECT_EQ(Entry.getTrailingDPValues(), nullptr);
+  Ret->moveBefore(Entry, Entry.end());
+  Br->eraseFromParent();
+
+  // There should continue to not be any debug-info anywhere.
+  EXPECT_EQ(Entry.getTrailingDPValues(), nullptr);
+  EXPECT_EQ(Exit.getTrailingDPValues(), nullptr);
+  EXPECT_FALSE(Ret->hasDbgValues());
+
+  UseNewDbgInfoFormat = false;
+}
+
 } // End anonymous namespace.
-#endif // EXPERIMENTAL_DEBUGINFO_ITERATORS

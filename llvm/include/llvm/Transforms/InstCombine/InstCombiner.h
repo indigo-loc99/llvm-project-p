@@ -18,6 +18,7 @@
 #ifndef LLVM_TRANSFORMS_INSTCOMBINE_INSTCOMBINER_H
 #define LLVM_TRANSFORMS_INSTCOMBINE_INSTCOMBINER_H
 
+#include "llvm/Analysis/DomConditionCache.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/TargetFolder.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -72,10 +73,11 @@ protected:
   TargetLibraryInfo &TLI;
   DominatorTree &DT;
   const DataLayout &DL;
-  const SimplifyQuery SQ;
+  SimplifyQuery SQ;
   OptimizationRemarkEmitter &ORE;
   BlockFrequencyInfo *BFI;
   ProfileSummaryInfo *PSI;
+  DomConditionCache DC;
 
   // Optional analyses. When non-null, these can both be used to do better
   // combining and will be updated to reflect any changes.
@@ -98,7 +100,9 @@ public:
                const DataLayout &DL, LoopInfo *LI)
       : TTI(TTI), Builder(Builder), Worklist(Worklist),
         MinimizeSize(MinimizeSize), AA(AA), AC(AC), TLI(TLI), DT(DT), DL(DL),
-        SQ(DL, &TLI, &DT, &AC), ORE(ORE), BFI(BFI), PSI(PSI), LI(LI) {}
+        SQ(DL, &TLI, &DT, &AC, nullptr, /*UseInstrInfo*/ true,
+           /*CanUseUndef*/ true, &DC),
+        ORE(ORE), BFI(BFI), PSI(PSI), LI(LI) {}
 
   virtual ~InstCombiner() = default;
 
@@ -163,45 +167,6 @@ public:
       return false;
     default:
       return true;
-    }
-  }
-
-  /// Given an exploded icmp instruction, return true if the comparison only
-  /// checks the sign bit. If it only checks the sign bit, set TrueIfSigned if
-  /// the result of the comparison is true when the input value is signed.
-  static bool isSignBitCheck(ICmpInst::Predicate Pred, const APInt &RHS,
-                             bool &TrueIfSigned) {
-    switch (Pred) {
-    case ICmpInst::ICMP_SLT: // True if LHS s< 0
-      TrueIfSigned = true;
-      return RHS.isZero();
-    case ICmpInst::ICMP_SLE: // True if LHS s<= -1
-      TrueIfSigned = true;
-      return RHS.isAllOnes();
-    case ICmpInst::ICMP_SGT: // True if LHS s> -1
-      TrueIfSigned = false;
-      return RHS.isAllOnes();
-    case ICmpInst::ICMP_SGE: // True if LHS s>= 0
-      TrueIfSigned = false;
-      return RHS.isZero();
-    case ICmpInst::ICMP_UGT:
-      // True if LHS u> RHS and RHS == sign-bit-mask - 1
-      TrueIfSigned = true;
-      return RHS.isMaxSignedValue();
-    case ICmpInst::ICMP_UGE:
-      // True if LHS u>= RHS and RHS == sign-bit-mask (2^7, 2^15, 2^31, etc)
-      TrueIfSigned = true;
-      return RHS.isMinSignedValue();
-    case ICmpInst::ICMP_ULT:
-      // True if LHS u< RHS and RHS == sign-bit-mask (2^7, 2^15, 2^31, etc)
-      TrueIfSigned = false;
-      return RHS.isMinSignedValue();
-    case ICmpInst::ICMP_ULE:
-      // True if LHS u<= RHS and RHS == sign-bit-mask - 1
-      TrueIfSigned = false;
-      return RHS.isMaxSignedValue();
-    default:
-      return false;
     }
   }
 

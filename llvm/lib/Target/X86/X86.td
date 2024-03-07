@@ -1256,11 +1256,6 @@ def ProcessorFeatures {
   list<SubtargetFeature> SRFFeatures =
     !listconcat(ADLFeatures, SRFAdditionalFeatures);
 
-  // Grandridge
-  list<SubtargetFeature> GRRAdditionalFeatures = [FeatureRAOINT];
-  list<SubtargetFeature> GRRFeatures =
-    !listconcat(SRFFeatures, GRRAdditionalFeatures);
-
   // Arrowlake S
   list<SubtargetFeature> ARLSAdditionalFeatures = [FeatureAVXVNNIINT16,
                                                    FeatureSHA512,
@@ -1706,10 +1701,6 @@ foreach P = ["goldmont_plus", "goldmont-plus"] in {
 }
 def : ProcModel<"tremont", SLMModel, ProcessorFeatures.TRMFeatures,
                 ProcessorFeatures.TRMTuning>;
-def : ProcModel<"sierraforest", AlderlakePModel, ProcessorFeatures.SRFFeatures,
-                ProcessorFeatures.TRMTuning>;
-def : ProcModel<"grandridge", AlderlakePModel, ProcessorFeatures.GRRFeatures,
-                ProcessorFeatures.TRMTuning>;
 
 // "Arrandale" along with corei3 and corei5
 foreach P = ["nehalem", "corei7", "core_i7_sse4_2"] in {
@@ -1784,6 +1775,10 @@ def : ProcModel<"alderlake", AlderlakePModel,
 // FIXME: Use Gracemont Schedule Model when it is ready.
 def : ProcModel<"gracemont", AlderlakePModel,
                 ProcessorFeatures.ADLFeatures, ProcessorFeatures.GRTTuning>;
+foreach P = ["sierraforest", "grandridge"] in {
+  def : ProcModel<P, AlderlakePModel, ProcessorFeatures.SRFFeatures,
+                ProcessorFeatures.GRTTuning>;
+}
 def : ProcModel<"raptorlake", AlderlakePModel,
                 ProcessorFeatures.ADLFeatures, ProcessorFeatures.ADLTuning>;
 def : ProcModel<"meteorlake", AlderlakePModel,
